@@ -1,5 +1,5 @@
 let t = require('@babel/types'), fs = require('fs'),
-  { hashifyName } = require('hashifyname/addon');
+  { hashifyName } = require('poggerhashez/addon');
 
 function getCssFromTemplateIfTernary(node, str = '') {
   let retval = { consequent: str, alternate: str };
