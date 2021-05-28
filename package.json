@@ -12,7 +12,6 @@
         "@babel/plugin-transform-runtime": "^7.13.6",
         "@babel/preset-env": "^7.13.5",
         "@babel/preset-react": "^7.12.13",
-        "poggerhashez": "github:poggerlabz/poggerhashez",
-        "react": "^17.0.2"
+        "poggerhashez": "github:poggerlabz/poggerhashez"
     }
 }
