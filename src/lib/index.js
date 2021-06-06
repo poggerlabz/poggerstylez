@@ -12,31 +12,17 @@ function styleFromPseudoObj(obj, props) {
 }
 
 export default function(hashifyName, pragma) {
-    return function(Element, style, lol = { paramName: null, baseStr: null }) {
+    return function(Element, style) {
         return function({ children, ...rest }) {
-            let actualStyle = '', className = '', { paramName, baseStr } = lol;
-            if (paramName && baseStr) {
-            className = "fc-" + hashifyName('fc ' + baseStr);
-            }
-            else {
-            actualStyle = typeof style === 'object' ?
+            let actualStyle = typeof style === 'object' ?
                 styleFromPseudoObj(style, rest) :
-                (typeof style === 'function' ? style(rest) : style);
+                (typeof style === 'function' ? style(rest) : style),
+                className = "fc-" + hashifyName('fc ' +
+                (typeof actualStyle === 'function' ? actualStyle('fc') : actualStyle)), addn = '';
 
-            className = "fc-" + hashifyName('fc ' +
-            (typeof actualStyle === 'function' ? actualStyle('fc') : actualStyle));
-            }
-
-            var addn = '';
-            if (paramName) {
-                if (typeof paramName === 'string') addn = rest[paramName] ?
-                    (' ' + paramName + "True") : (' '  + paramName + "False");
-                else {
-                    for (var p = 0; p < paramName.length; p++) {
-                    addn += rest[paramName[p]] ?
-                        (' ' + paramName[p] + "True") : (' '  + paramName[p] + "False");
-                    }
-                }
+            for (let paramName in rest) {
+                if (typeof paramName === 'string' && typeof rest[paramName] === 'boolean')
+                    addn = rest[paramName] ? (' ' + paramName + "True") : (' '  + paramName + "False");
             }
 
             /** @jsx pragma */ 
