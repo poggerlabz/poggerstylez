@@ -5,64 +5,14 @@ function getCssFromTemplateIfTernary(node, str = '') {
   let retval = { consequent: str, alternate: str };
   let attr = node.quasis[0].value.raw,
     {
+      test,
       consequent: { value: ifTrue },
       alternate: { value: ifFalse }
     } = node.expressions[0];
+  retval.paramName = test && test.name; 
   retval.consequent +=  `${attr}${ifTrue}`;
   retval.alternate += `${attr}${ifFalse}`;
   return retval;
-}
-
-function getCssFromTernary(node, baseStr, paramName) {
-  let { consequent, alternate } = node;
-
-  return {
-    baseStr,
-    paramName,
-    consequent: consequent.value,
-    alternate: alternate.value
-  }
-}
-
-function getCssFromBinaryExp({ left, right }, str = '') {
-  if (left.type === 'StringLiteral') {
-    if (right.type === 'TemplateLiteral' &&
-    right.expressions[0].type === 'ConditionalExpression') {
-      return getCssFromTemplateIfTernary(right, left.value);
-    }
-    if (right.type === 'BinaryExpression') {
-      return getCssFromBinaryExp(right, str + left.value);
-    }
-  }
-  else if (left.type === 'BinaryExpression') {
-    if (right.type === 'StringLiteral') {
-      return getCssFromBinaryExp(left, str + right.value);
-    }
-    if (right.type === 'TemplateLiteral') {
-      let c = getCssFromBinaryExp(left),
-        d = getCssFromTemplateIfTernary(right);
-      if (Object.keys(c).length === Object.keys(d).length) {
-        let e = {}
-        for (var k in c) {
-          e[k] = c[k] + (c[k].endsWith(";") ? '' : ';') + d[k];
-        }
-
-        return e;
-      }
-    }
-  }
-  else if (left.type === 'TemplateLiteral' &&
-    right.type === 'TemplateLiteral') {
-    let lft = getCssFromTemplateIfTernary(left),
-      rgt = getCssFromTemplateIfTernary(right);
-
-    return {
-      "tt": str + lft.consequent + right.consequent,
-      "tf": str + lft.consequent + right.alternate,
-      "ft": str + lft.alternate + right.consequent,
-      "ff": str + lft.alternate + right.alternate
-    }
-  }
 }
 
 function getTernParam(node) {
@@ -89,19 +39,24 @@ function getTernParam(node) {
   }
 }
 
-function spitNewFromCss(element, className) {
+function spitNewFromCss(element, className, attributes = []) {
   return t.functionExpression(null, [
     t.objectPattern([
       t.objectProperty(t.identifier("children"), t.identifier("children")), 
+      ...attributes.map(n => t.objectProperty(t.identifier(n), t.identifier(n))),
       t.restElement(t.identifier('rest'))
     ])
   ],
   t.blockStatement([
+    t.variableDeclaration("let", [t.variableDeclarator(t.identifier("newClassName"), t.stringLiteral(className))]),
+    ...attributes.map(n =>
+        t.expressionStatement(t.assignmentExpression("+=", t.identifier("newClassName"), t.conditionalExpression(t.identifier(n), t.stringLiteral(" " + n + "True"), t.stringLiteral(" " + n + "False"))))
+    ),
     t.returnStatement(
       t.jsxElement(
         t.jsxOpeningElement(
           t.jsxIdentifier(element), [
-            t.jsxAttribute(t.jsxIdentifier("className"), t.stringLiteral(className)),
+            t.jsxAttribute(t.jsxIdentifier("className"), t.jsxExpressionContainer(t.identifier("newClassName"))),
             t.jsxSpreadAttribute(t.identifier("rest"))
           ]),
         t.jsxClosingElement(t.jsxIdentifier(element)), 
@@ -112,47 +67,7 @@ function spitNewFromCss(element, className) {
 }
 
 module.exports = function () {
-  let styles = {}, fn = '',
-    getCssFromBinaryExp = function({ left, right }, str = '') {
-      if (left.type === 'StringLiteral') {
-        if (right.type === 'TemplateLiteral' &&
-        right.expressions[0].type === 'ConditionalExpression') {
-          return getCssFromTemplateIfTernary(right, left.value);
-        }
-        if (right.type === 'BinaryExpression') {
-          return getCssFromBinaryExp(right, str + left.value);
-        }
-      }
-      else if (left.type === 'BinaryExpression') {
-        if (right.type === 'StringLiteral') {
-          return getCssFromBinaryExp(left, str + right.value);
-        }
-        if (right.type === 'TemplateLiteral') {
-          let c = getCssFromBinaryExp(left),
-            d = getCssFromTemplateIfTernary(right);
-          if (Object.keys(c).length === Object.keys(d).length) {
-            let e = {}
-            for (var k in c) {
-              e[k] = c[k] + (c[k].endsWith(";") ? '' : ';') + d[k];
-            }
-
-            return e;
-          }
-        }
-      }
-      else if (left.type === 'TemplateLiteral' &&
-        right.type === 'TemplateLiteral') {
-        let lft = getCssFromTemplateIfTernary(left),
-          rgt = getCssFromTemplateIfTernary(right);
-
-        return {
-          "tt": str + lft.consequent + right.consequent,
-          "tf": str + lft.consequent + right.alternate,
-          "ft": str + lft.alternate + right.consequent,
-          "ff": str + lft.alternate + right.alternate
-        }
-      }
-    }
+  let styles = {}, fn = '';
 
   return {
     visitor: {
@@ -162,7 +77,7 @@ module.exports = function () {
         }
       },
       CallExpression(path, { opts }) {
-        let { node: { callee, arguments: args } } = path, className;
+        let { node: { callee, arguments: args } } = path, className, attrs = [];
 
         if (fn === '') {
           if (opts && opts.toFile) fn = opts.toFile;
@@ -174,50 +89,48 @@ module.exports = function () {
               params: styleParams,
               body: styleBody,
               properties: styleProperties
-            }] = args, css = '';
+            }] = args, css = '', parseStyleBody = function(node, depth = 0) {
+              if (node.type === "BinaryExpression" && node.operator === "+") {
+                if (node.left.type === 'StringLiteral') {
+                  if (typeof css === 'string') css = [];
+                  css.push({
+                    baseStr: node.left.value
+                  });
+                }
+                else if (node.left.type === 'TemplateLiteral') {
+                  if (typeof css === 'string') css = [];
+                    css.push({
+                      params: [getTernParam(node.left)]
+                    });
+                }
+                else if (node.left.type === "BinaryExpression") parseStyleBody(node.left, depth + 1);
+
+                if (node.right.type === 'TemplateLiteral' || node.right.type === 'ConditionalExpression') {
+                  if (typeof css === 'string') css = [];
+                  css.push({
+                    params: [getTernParam(node.right)]
+                  });
+                }
+                else if (node.right.type === "BinaryExpression") parseStyleBody(node.right, depth + 1);
+              }
+              else if (node.type === 'TemplateLiteral') {
+                if (typeof css === 'string') css = [];
+                css.push({ 
+                  params: [getCssFromTemplateIfTernary(node)]
+                });
+              }
+            };
           if (styleType === 'StringLiteral') {
             css = styleValue;
           }
           else if (styleType === 'ArrowFunctionExpression') {
             if (styleParams[0].type === 'ObjectPattern') {
-              if (styleBody.type === 'BinaryExpression' &&
-                styleBody.operator == '+') {
-                if (styleBody.left.type === 'StringLiteral') {
-                  if (styleBody.right.type === 'ConditionalExpression' ||
-                    styleBody.right.type === 'TemplateLiteral') {
-                    css = {
-                      baseStr: styleBody.left.value,
-                      params: [getTernParam(styleBody.right)]
-                    }
-                  }
-                  else if (styleBody.right.type === 'BinaryExpression') {
-                    css = {
-                      baseStr: styleBody.left.value,
-                      params: [getTernParam(styleBody.right.left),
-                        getTernParam(styleBody.right.right), ]
-                    }
-                  }
+              styleParams[0].properties.forEach((node) => {
+                attrs.push(node.value.name);
+              });
 
-                  let paramList = styleParams[0].properties.map(({
-                    value: { name } }) => name);
-
-                  if (args.length === 2) {
-                    path.node.arguments[2] = t.objectExpression([
-                      t.objectProperty(t.Identifier('baseStr'),
-                        t.stringLiteral(styleBody.left.value)),
-                      t.objectProperty(t.Identifier('paramName'),
-                        paramList.length === 1 ?
-                          t.stringLiteral(paramList[0]) :
-                          t.arrayExpression([
-                            paramList.map(lit => t.stringLiteral(lit))
-                          ])
-                      ),
-                    ]);
-                  }
-                }
-                else {
-                  css = getCssFromBinaryExp(styleBody);
-                }
+              if (styleBody.type === 'BinaryExpression' && styleBody.operator == '+') {
+                parseStyleBody(styleBody);
               }
             }
           }
@@ -235,7 +148,22 @@ module.exports = function () {
             styles[`.${className}`] = css;
           }
           else {
-            if (Object.keys(css).includes('baseStr')) {
+            if (css.length) {
+              for (let { baseStr, params } of css) {
+                if (baseStr !== undefined && baseStr !== null) {
+                  className = `fc-${hashifyName(`fc ${baseStr}`)}`;
+                  styles[`.${className}`] = baseStr;
+                }
+                if (params) {
+                  for (var p = 0; p < params.length; p++) {
+                    console.log(params[p]);
+                    let { paramName, ifTrue, ifFalse, consequent, alternate } = params[p];
+                    styles[`.${className}.${paramName}True`] = ifTrue || consequent;
+                    styles[`.${className}.${paramName}False`] = ifFalse || alternate;
+                  }
+                }
+              }
+            } else if (Object.keys(css).includes('baseStr')) {
               let { baseStr, params } = css;
               className = `fc-${hashifyName(`fc ${baseStr}`)}`;
               styles[`.${className}`] = baseStr;
@@ -265,7 +193,7 @@ module.exports = function () {
               }
             }
           }
-          path.replaceWith(spitNewFromCss(element, className));
+          path.replaceWith(spitNewFromCss(element, className, attrs));
         }
       }
     },
@@ -273,13 +201,13 @@ module.exports = function () {
       if (fn.length) {
         let fileStr = '';
         for (let selector in styles) {
-          if (styles[selector].length)
+          if (styles[selector] && styles[selector].length > 3)
           // eslint-disable-next-line prefer-template
-            fileStr += selector + '{' + styles[selector] + '}';
+            fileStr += selector + '{' + styles[selector] + (styles[selector].endsWith(";") ? "" : ";") +  '}';
         }
         if (typeof fn === 'string') fs.writeFileSync(fn, fileStr);
-        else for (let f = 0; f < fn.length; f++) {
-          fs.writeFileSync(fn[f], fileStr);
+        else for (f of fn) {
+          fs.writeFileSync(f, fileStr);
         }
       }
     }
