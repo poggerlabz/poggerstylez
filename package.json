@@ -3,7 +3,8 @@
     "version": "0.0.1",
     "scripts": {
         "postinstall": "npm run-script build",
-        "build": "babel src -d . --ignore node_modules/ "
+        "build": "babel src -d . --ignore node_modules/",
+        "test": "mocha test/test.js --require @babel/register"
     },
     "dependencies": {
         "@babel/cli": "^7.13.16",
