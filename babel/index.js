@@ -1,43 +1,6 @@
 let t = require('@babel/types'), fs = require('fs'),
-  { hashifyName } = require('poggerhashez/addon');
-
-function getCssFromTemplateIfTernary(node, str = '') {
-  let retval = { consequent: str, alternate: str };
-  let attr = node.quasis[0].value.raw,
-    {
-      test,
-      consequent: { value: ifTrue },
-      alternate: { value: ifFalse }
-    } = node.expressions[0];
-  retval.paramName = test && test.name; 
-  retval.consequent +=  `${attr}${ifTrue}`;
-  retval.alternate += `${attr}${ifFalse}`;
-  return retval;
-}
-
-function getTernParam(node) {
-  if (node.type === 'TemplateLiteral') {
-    let attr = node.quasis[0].value.raw,
-      {
-        test: { name: paramName },
-        consequent: { value: ifTrue },
-        alternate: { value: ifFalse }
-      } = node.expressions[0];
-    return {
-      paramName,
-      ifTrue: attr + ifTrue,
-      ifFalse: attr + ifFalse
-    }
-  }
-  else if (node.type === 'ConditionalExpression') {
-    var paramName = node.test.name;
-    return {
-      paramName,
-      ifTrue: node.consequent.value,
-      ifFalse: node.alternate.value
-    }
-  }
-}
+  { hashifyName } = require('poggerhashez/addon'),
+  { withSemicolon, parseStyleBody } = require('./common.js');
 
 function spitNewFromCss(element, className, attributes = []) {
   return t.functionExpression(null, [
@@ -67,7 +30,29 @@ function spitNewFromCss(element, className, attributes = []) {
 }
 
 module.exports = function () {
-  let styles = {}, fn = '';
+  var styles = {}, fn = '';
+
+  function outputStyles(obj) {
+    if (obj.length) {
+      for (let obs in obj) {
+        outputStyles(obs);
+      }
+    }
+
+    let { baseStr, className, params } = obj;
+
+    if (baseStr !== undefined && baseStr !== null) {
+      className = `fc-${hashifyName(`fc ${withSemicolon(baseStr)}`)}`;
+      styles[`.${className}`] = withSemicolon(baseStr);
+    }
+    if (params) {
+      for (let { paramName, ifTrue, ifFalse } of params) {
+        styles[`.${className}.${paramName}True`] = ifTrue;
+        styles[`.${className}.${paramName}False`] = ifFalse;
+      }
+    }
+    return className;
+  }
 
   return {
     visitor: {
@@ -83,117 +68,8 @@ module.exports = function () {
           if (opts && opts.toFile) fn = opts.toFile;
         }
         if (callee.name === 'fromCss') {
-          let [{ value: element }, {
-              type: styleType,
-              value: styleValue,
-              params: styleParams,
-              body: styleBody,
-              properties: styleProperties
-            }] = args, css = '', parseStyleBody = function(node, depth = 0) {
-              if (node.type === "BinaryExpression" && node.operator === "+") {
-                if (node.left.type === 'StringLiteral') {
-                  if (typeof css === 'string') css = [];
-                  css.push({
-                    baseStr: node.left.value
-                  });
-                }
-                else if (node.left.type === 'TemplateLiteral') {
-                  if (typeof css === 'string') css = [];
-                    css.push({
-                      params: [getTernParam(node.left)]
-                    });
-                }
-                else if (node.left.type === "BinaryExpression") parseStyleBody(node.left, depth + 1);
-
-                if (node.right.type === 'TemplateLiteral' || node.right.type === 'ConditionalExpression') {
-                  if (typeof css === 'string') css = [];
-                  css.push({
-                    params: [getTernParam(node.right)]
-                  });
-                }
-                else if (node.right.type === "BinaryExpression") parseStyleBody(node.right, depth + 1);
-              }
-              else if (node.type === 'TemplateLiteral') {
-                if (typeof css === 'string') css = [];
-                css.push({ 
-                  params: [getCssFromTemplateIfTernary(node)]
-                });
-              }
-            };
-          if (styleType === 'StringLiteral') {
-            css = styleValue;
-          }
-          else if (styleType === 'ArrowFunctionExpression') {
-            if (styleParams[0].type === 'ObjectPattern') {
-              styleParams[0].properties.forEach((node) => {
-                attrs.push(node.value.name);
-              });
-
-              if (styleBody.type === 'BinaryExpression' && styleBody.operator == '+') {
-                parseStyleBody(styleBody);
-              }
-            }
-          }
-          else if (styleType === 'ObjectExpression') {
-            css = {};
-            for (var i = 0; i < styleProperties.length; i++) {
-              css[styleProperties[i].key.value] =
-                styleProperties[i].value.value;
-            }
-          }
-
-          if (typeof css === 'string') {
-            if (!css.endsWith(";")) css += ';';
-            className = `fc-${hashifyName(`fc ${css}`)}`;
-            styles[`.${className}`] = css;
-          }
-          else {
-            if (css.length) {
-              for (let { baseStr, params } of css) {
-                if (baseStr !== undefined && baseStr !== null) {
-                  className = `fc-${hashifyName(`fc ${baseStr}`)}`;
-                  styles[`.${className}`] = baseStr;
-                }
-                if (params) {
-                  for (var p = 0; p < params.length; p++) {
-                    console.log(params[p]);
-                    let { paramName, ifTrue, ifFalse, consequent, alternate } = params[p];
-                    styles[`.${className}.${paramName}True`] = ifTrue || consequent;
-                    styles[`.${className}.${paramName}False`] = ifFalse || alternate;
-                  }
-                }
-              }
-            } else if (Object.keys(css).includes('baseStr')) {
-              let { baseStr, params } = css;
-              className = `fc-${hashifyName(`fc ${baseStr}`)}`;
-              styles[`.${className}`] = baseStr;
-              for (var p = 0; p < params.length; p++) {
-                let { paramName, ifTrue, ifFalse } = params[p];
-                styles[`.${className}.${paramName}True`] = ifTrue;
-                styles[`.${className}.${paramName}False`] = ifFalse;
-              }
-            }
-            else if (Object.keys(css).includes('&')) {
-              // First aggregate all selectors
-              let mash = '';
-              for (let k in css) {
-                let ac = css[k].endsWith(";") ? css[k] : (css[k] + ';')
-                mash += k.replace(/&/g, '.fc') + '{' + css[k] + '}';
-              }
-              className = `fc-${hashifyName(`fc ${mash}`)}`;
-              for (let o in css) {
-                styles[o.replace(/&/g, `.${className}`)] = css[o];
-              }
-            }
-            else {
-              for (let i in css) {
-                let ac = css[i].endsWith(";") ? css[i] : (css[i] + ';');
-                className = `fc-${hashifyName(`fc ${ac}`)}`;
-                styles[`.${className}`] = ac;
-              }
-            }
-          }
-          path.replaceWith(spitNewFromCss(element, className, attrs));
+          let [{ value: element }, arg] = args;
+          path.replaceWith(spitNewFromCss(element, outputStyles(parseStyleBody(arg)), attrs));
         }
       }
     },
@@ -203,7 +79,7 @@ module.exports = function () {
         for (let selector in styles) {
           if (styles[selector] && styles[selector].length > 3)
           // eslint-disable-next-line prefer-template
-            fileStr += selector + '{' + styles[selector] + (styles[selector].endsWith(";") ? "" : ";") +  '}';
+            fileStr += selector + '{' + styles[selector] +  '}';
         }
         if (typeof fn === 'string') fs.writeFileSync(fn, fileStr);
         else for (f of fn) {
