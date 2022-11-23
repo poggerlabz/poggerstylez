@@ -9,6 +9,7 @@ function getTernParam(node, attr = '') {
       ifFalse: attr + node.alternate.value
     }
   }
+  return {};
 }
 
 module.exports = {
@@ -43,7 +44,7 @@ module.exports = {
         let mash = '';
         let num = 0;
 
-        for (var { key: { value: keyVal }, value } of node.properties) {
+        for (var { key: { value: keyVal }, value: { value: valVal } } of node.properties) {
           themKeys.push(keyVal);
           themVals.push(valVal);
           num++;

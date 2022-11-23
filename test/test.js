@@ -1,6 +1,8 @@
 import { expect } from 'chai';
 import { parse } from '@babel/parser';
+import generator from '@babel/generator';
 import { withSemicolon, parseStyleBody } from '../babel/common.js';
+import spitNewFromCss from '../babel/outputJsx.js';
 
 describe('correct', function () {
   it('semicolon', function (done) {
@@ -16,6 +18,40 @@ describe('correct', function () {
       baseStr: "display:none;",
       className: "lol"
     }]);
+    done();
+  });
+});
+
+describe('JSX output', function () {
+  it("no attributes", function (done) {
+    let ast = spitNewFromCss("div", "main");
+
+    let code = generator(ast).code;
+
+    expect(code).to.be.equal(`function ({
+  children: children,
+  ...rest
+}) {
+  let newClassName = "main";
+  return <div className={newClassName} {...rest}>{children}</div>;
+}`);
+    done();
+  });
+
+  it("with attributes", function (done) {
+    let ast = spitNewFromCss("div", "main", ["ready"]);
+
+    let code = generator(ast).code;
+
+    expect(code).to.be.equal(`function ({
+  children: children,
+  ready: ready,
+  ...rest
+}) {
+  let newClassName = "main";
+  newClassName += ready ? " readyTrue" : " readyFalse";
+  return <div className={newClassName} {...rest}>{children}</div>;
+}`);
     done();
   });
 });
