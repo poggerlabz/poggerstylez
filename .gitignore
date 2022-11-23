@@ -3,3 +3,4 @@ server/
 lib/
 node_modules/
 !src/*
+.vs/
