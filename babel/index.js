@@ -53,9 +53,10 @@ module.exports = function () {
       if (fn.length) {
         let fileStr = '';
         for (let selector in styles) {
-          if (styles[selector] && styles[selector].length > 3)
+          let entry = styles[selector];
+          if (entry && entry.length > 3)
           // eslint-disable-next-line prefer-template
-            fileStr += selector + '{' + styles[selector] +  '}';
+            fileStr += selector + '{' + entry +  '}';
         }
         if (typeof fn === 'string') fs.writeFileSync(fn, fileStr);
         else for (f of fn) {
