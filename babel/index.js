@@ -1,6 +1,6 @@
 let fs = require('fs'), spitNewFromCss = require("./outputJsx.js"),
   { hashifyName } = require('poggerhashez/addon'),
-  { withSemicolon, parseStyleBody } = require('./common.js');
+  { withSemicolon, parseStyleBody, cssBlockString } = require('./common.js');
 
 module.exports = function () {
   var styles = {}, fn = '';
@@ -54,9 +54,9 @@ module.exports = function () {
         let fileStr = '';
         for (let selector in styles) {
           let entry = styles[selector];
-          if (entry && entry.length > 3)
-          // eslint-disable-next-line prefer-template
-            fileStr += selector + '{' + entry +  '}';
+          if (entry && entry.length > 3) {
+            fileStr += cssBlockString(selector, entry);
+          }
         }
         if (typeof fn === 'string') fs.writeFileSync(fn, fileStr);
         else for (f of fn) {
