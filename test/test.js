@@ -5,8 +5,13 @@ import { withSemicolon, parseStyleBody } from '../babel/common.js';
 import spitNewFromCss from '../babel/outputJsx.js';
 
 describe('correct', function () {
-  it('semicolon', function (done) {
+  it('with semicolon', function (done) {
     expect(withSemicolon("display:none;")).to.be.equal("display:none;");
+    done();
+  });
+
+  it('with no semicolon', function (done) {
+    expect(withSemicolon("display:none")).to.be.equal("display:none;");
     done();
   });
 
