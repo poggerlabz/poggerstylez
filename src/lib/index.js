@@ -1,10 +1,12 @@
+import { replaceAmpersand, cssBlockString } from '../../common/index.js';
+
 function styleFromPseudoObj(obj, props) {
   return function(className) {
     let string = '';
 
     for (let sel in obj) {
-      string += sel.replace(/&/g, '.' + className) + '{' +
-          (typeof obj[sel] === 'function' ? obj[sel](props) : obj[sel]) + '}';
+      string += cssBlockString(replaceAmpersand(sel, className),
+          (typeof obj[sel] === 'function' ? obj[sel](props) : obj[sel]));
     }
 
     return string;
@@ -22,7 +24,7 @@ export default function(hashifyName, pragma) {
 
             for (let paramName in rest) {
                 if (typeof paramName === 'string' && typeof rest[paramName] === 'boolean')
-                    addn = rest[paramName] ? (' ' + paramName + "True") : (' '  + paramName + "False");
+                    addn = ' ' + paramName + (rest[paramName] ? "True" : "False");
             }
 
             /** @jsx pragma */ 

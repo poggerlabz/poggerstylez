@@ -1,3 +1,5 @@
+import { replaceAmpersand, cssBlockString } from '../common/index.js';
+
 function getTernParam(node, attr = '') {
   switch (node.type) {
     case 'TemplateLiteral':
@@ -10,10 +12,6 @@ function getTernParam(node, attr = '') {
       }
   }
   return {};
-}
-
-function cssBlockString(selector, block) {
-  return selector + '{' + block + '}';
 }
 
 module.exports = {
@@ -45,12 +43,12 @@ module.exports = {
 
         for (let { key: { value: keyVal }, value: { value: valVal } } of node.properties) {
           keyValMap[keyVal] = valVal;
-          mash += cssBlockString(keyVal.replace(/&/g, '.fc'), valVal);
+          mash += cssBlockString(replaceAmpersand(keyVal, 'fc'), valVal);
         }
 
         className = `fc-${hashifyName(`fc ${mash}`)}`;
         return Object.keys(keyValMap).map(kVal => ({
-            className: kVal.replace(/&/g, `.${className}`),
+            className: replaceAmpersand(kVal, className),
             baseStr: keyValMap[kVal]
           }));
       case 'ArrowFunctionExpression':

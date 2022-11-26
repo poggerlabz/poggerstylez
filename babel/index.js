@@ -1,6 +1,7 @@
 let fs = require('fs'), spitNewFromCss = require("./outputJsx.js"),
+  { cssBlockString } = require('../common/index.js'),
   { hashifyName } = require('poggerhashez/addon'),
-  { withSemicolon, parseStyleBody, cssBlockString } = require('./common.js');
+  { withSemicolon, parseStyleBody } = require('./common.js');
 
 module.exports = function () {
   var styles = {}, fn = '';
