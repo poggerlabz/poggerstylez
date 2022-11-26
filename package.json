@@ -3,15 +3,25 @@
     "version": "0.0.1",
     "scripts": {
         "postinstall": "npm run-script build",
-        "build": "babel src -d . --ignore node_modules/ "
+        "build": "babel src -d . --ignore node_modules/",
+        "test": "mocha test/test.js --require @babel/register"
     },
     "dependencies": {
         "@babel/cli": "^7.13.16",
+        "@babel/core": "^7.20.2",
         "@babel/plugin-syntax-jsx": "^7.12.13",
         "@babel/plugin-transform-react-jsx": "^7.12.17",
         "@babel/plugin-transform-runtime": "^7.13.6",
         "@babel/preset-env": "^7.13.5",
         "@babel/preset-react": "^7.12.13",
         "poggerhashez": "github:poggerlabz/poggerhashez"
+    },
+    "devDependencies": {
+        "@babel/generator": "^7.20.2",
+        "@babel/parser": "^7.20.2",
+        "@babel/register": "^7.18.9",
+        "babel-plugin-tester": "^10.1.0",
+        "chai": "^4.3.6",
+        "mocha": "^10.1.0"
     }
 }
